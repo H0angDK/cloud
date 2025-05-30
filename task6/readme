@@ -1,0 +1,74 @@
+parent_path=$(pwd)
+# запустить если /models пустой
+docker run \
+    -v ${parent_path}/data:/data  \
+    -v ${parent_path}/config:/config \
+    -v ${parent_path}/models:/models \
+    ludwigai/ludwig:master \
+    experiment --config /config/config.yaml \
+        --dataset /data/Airlines.csv \
+        --output_directory /models
+        
+docker run \
+  --rm -it \
+  -p 127.0.0.1:4566:4566 \
+  -p 127.0.0.1:4510-4559:4510-4559 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  localstack/localstack
+
+pip install awscli-local # если нет 
+
+awslocal s3api create-bucket --bucket ludwig
+
+LUDWIG_EXPERIMENT_FOLDER="experiment_run" # <--- ОБЯЗАТЕЛЬНО ЗАМЕНИТЕ ЭТО! если оно не совпало
+parent_path=$(pwd)
+# Полный локальный путь к папке 'model' внутри вашего эксперимента
+LOCAL_MODEL_DIR="${parent_path}/models/${LUDWIG_EXPERIMENT_FOLDER}/model"
+
+# Целевой S3-путь в LocalStack. Мы загрузим ее в бакет 'ludwig' под префикс 'trained_models/'
+S3_TARGET_PATH="s3://ludwig/trained_models/"
+
+awslocal s3 cp "${LOCAL_MODEL_DIR}" "${S3_TARGET_PATH}" --recursive --exclude "*.DS_Store*"
+
+docker run \
+  -v ${parent_path}/data:/data \
+  -v ${parent_path}/result:/result \
+  -e AWS_ENDPOINT_URL=http://localhost.localstack.cloud:4566 \
+  -e AWS_ACCESS_KEY_ID=test \
+  -e AWS_SECRET_ACCESS_KEY=test \
+  -e AWS_DEFAULT_REGION=us-east-1 \
+    -e S3_USE_SSL=false \
+  -e S3_VERIFY_SSL=false \
+  --network="host" \
+  ludwigai/ludwig:master \
+  predict \
+  --model_path "${S3_TARGET_PATH}" \
+  --dataset /data/Airlines.test.hdf5 \
+  --output_directory /result
+
+
+docker run -p 9200:9200 -p 9600:9600 \
+-e "discovery.type=single-node" \
+-e "plugins.security.disabled=true" \
+-e "OPENSEARCH_INITIAL_ADMIN_PASSWORD=coRrecth0rseba++ery9.23.2007staple$" \
+opensearchproject/opensearch:latest
+
+
+curl -XGET "http://localhost:9200/flights/_search?pretty" -H 'Content-Type: application/json' -d'
+{
+  "query": {
+    "term": {
+      "AirportFrom": "SFO"
+    }
+  }
+}'
+
+
+curl -XGET "http://localhost:9200/flights/_search?pretty" -H 'Content-Type: application/json' -d'
+{
+  "aggs": {
+    "avg_flight_length": {
+      "avg": { "field": "Length" }
+    }
+  }
+}'

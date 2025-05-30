@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=kinesis
+      - DEBUG=1
+      - DATA_DIR=/tmp/localstack/data
+    volumes:
+      - "${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+
+  jobmanager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081" # Flink Web UI
+      - "6123:6123" # Flink RPC port for job submission
+    command: jobmanager
+    environment:
+      - FLINK_PROPERTIES=jobmanager.rpc.address:jobmanager
+      - JOB_MANAGER_RPC_ADDRESS=jobmanager
+
+  taskmanager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - jobmanager
+    command: taskmanager
+    environment:
+      - FLINK_PROPERTIES=jobmanager.rpc.address:jobmanager
+      - FLINK_PROPERTIES=taskmanager.numberOfTaskSlots:1
+      - JOB_MANAGER_RPC_ADDRESS=jobmanager
+
+  speed-processor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - localstack
+      - jobmanager
+      - taskmanager
+    environment:
+      - AWS_ENDPOINT_URL=http://localstack:4566
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+      - FLINK_JOBMANAGER_HOST=jobmanager
+      - FLINK_JOBMANAGER_PORT=6123 # Corrected to Flink's default RPC port

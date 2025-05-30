@@ -1,0 +1,43 @@
+input_features:
+  - name: id
+    type: number
+  - name: Airline
+    type: category
+  - name: Flight
+    type: category # Типы воздушных судов, представленные числом (например, 1, 2, 3 для разных моделей)
+    # Несмотря на "numeric" в описании, "Types of Aircraft" скорее всего являются дискретными категориями.
+    # Если эти числа имеют какое-либо смысловое числовое значение (например, вместимость),
+    # можно рассмотреть type: numerical, но для "типа" category более надежен.
+  - name: AirportFrom
+    type: category # Аэропорт отправления (например, "CDG", "JFK")
+  - name: AirportTo
+    type: category # Аэропорт назначения (например, "CDG", "JFK")
+  - name: DayOfWeek
+    type: category # День недели (например, "Monday", "Tuesday")
+  - name: Time
+    type: numerical # "Затраченное время" или "Время суток" в числовом формате (например, минуты от полуночи)
+    preprocessing:
+      missing_value_strategy: fill_with_mean # Заполняем пропущенные значения средним
+      normalization: zscore # Нормализуем данные для лучшей работы нейронных сетей
+  - name: Length
+    type: numerical # Продолжительность полета или расстояние
+    preprocessing:
+      missing_value_strategy: fill_with_mean
+      normalization: zscore
+
+output_features:
+  - name: Delay
+    type: binary # Целевая переменная: является ли рейс задержанным (0 или 1)
+    loss:
+      type: binary_weighted_cross_entropy # Стандартная функция потерь для бинарной классификации
+    metric:
+      type: accuracy # Основная метрика для оценки модели
+      metrics: [accuracy, f1_score, precision, recall, roc_auc] # Дополнительные метрики
+
+trainer:
+  epochs: 20 # Количество эпох обучения
+  batch_size: 128 # Размер батча
+  learning_rate: 0.001 # Скорость обучения
+  early_stop: 5 # Останавливать обучение, если метрика валидации не улучшается 5 эпох подряд
+  validation_field: "Delay"
+  validation_metric: "accuracy"
