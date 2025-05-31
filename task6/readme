@@ -54,6 +54,10 @@ docker run -p 9200:9200 -p 9600:9600 \
 opensearchproject/opensearch:latest
 
 
+pip install opensearch-py
+python launch.py
+
+
 curl -XGET "http://localhost:9200/flights/_search?pretty" -H 'Content-Type: application/json' -d'
 {
   "query": {
