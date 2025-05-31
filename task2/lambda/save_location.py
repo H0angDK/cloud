@@ -1,6 +1,7 @@
 import json
 import boto3
-from datetime import datetime
+import os
+import time
 
 dynamodb = boto3.resource(
     'dynamodb',
@@ -15,26 +16,27 @@ table = dynamodb.Table('gps_locations')
 def lambda_handler(event, context):
     try:
         # Parse the incoming event
-        location_data = json.loads(event['body']) if isinstance(event, dict) and 'body' in event else event
+        body = json.loads(event) if isinstance(event, str) else event
         
-        # Prepare item for DynamoDB
-        item = {
-            'device_id': location_data['device_id'],
-            'timestamp': location_data['timestamp'],  # Already an integer
-            'latitude': location_data['latitude'],
-            'longitude': location_data['longitude']
+        # Extract location data
+        location_data = {
+            'device_id': body['device_id'],
+            'timestamp': body['timestamp'],
+            'latitude': body['latitude'],
+            'longitude': body['longitude']
         }
         
         # Save to DynamoDB
-        table.put_item(Item=item)
+        table.put_item(Item=location_data)
         
         return {
             'statusCode': 200,
             'body': json.dumps({
                 'message': 'Location saved successfully',
-                'data': item
+                'data': location_data
             })
         }
+        
     except Exception as e:
         return {
             'statusCode': 500,

@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  localstack:
+    image: localstack/localstack:latest
+    container_name: localstack
+    ports:
+      - "4566:4566" # Default LocalStack edge port
+    environment:
+      - SERVICES=s3 # Only enable S3 service
+      - DEFAULT_REGION=us-east-1 # Or your preferred region
+      - AWS_ACCESS_KEY_ID=test # Dummy credentials for LocalStack
+      - AWS_SECRET_ACCESS_KEY=test # Dummy credentials for LocalStack
+
+  spark-master:
+    image: bitnami/spark:3.5.1
+    container_name: spark-master
+    ports:
+      - "8080:8080" # Spark Master Web UI
+      - "7077:7077" # Spark Master internal communication
+    environment:
+      - SPARK_MODE=master
+      # Disable authentication/encryption for simplicity in local dev
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+
+  spark-worker:
+    build: . # Build from the Dockerfile in the current directory
+    container_name: spark-worker
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_CORES=1
+      - SPARK_WORKER_MEMORY=1G
+      # Disable authentication/encryption for simplicity in local dev
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    volumes:
+      - ./app:/app  # Mount the app directory to /app in the container
